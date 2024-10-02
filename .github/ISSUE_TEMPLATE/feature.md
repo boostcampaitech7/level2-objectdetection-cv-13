@@ -1,11 +1,3 @@
----
-name: feature
-about: Suggest an idea for this project
-title: '[feat] #[issue number] [issue name]'
-labels: ''
-assignees: ''
----
-
 ## ✨1. 이 ISSUE를 통해 해결하려는 문제가 무엇인가요?
 
 <br>
