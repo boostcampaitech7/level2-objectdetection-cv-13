@@ -6,7 +6,7 @@ import wandb
 from detectron2.engine import DefaultTrainer
 from detectron2.data import build_detection_train_loader
 from detectron2.evaluation import COCOEvaluator
-from data_mapper import MyMapper
+from Data_mapper import MyMapper
 
 
 class MyTrainer(DefaultTrainer):

@@ -10,9 +10,16 @@ def get_timestamp():
     now = datetime.datetime.now()
     return now.strftime("%m%d_%H%M")
 
+def load_config(file_path):
+    with open(file_path, 'r') as file:
+        config = yaml.safe_load(file)
+    return config
+
+
+
 
 class WandbLoggerHook(HookBase):
-    def __init__(self, model_name, project_name, entity, group, tags=None, init=True):
+    def __init__(self, model_name, project_name, entity, group, tags=None):
         super().__init__()
 
         self._window_size = 20
@@ -22,7 +29,7 @@ class WandbLoggerHook(HookBase):
         wandb.init(
             project=project_name,
             entity=entity,
-            name=f"taegyun_test_{get_timestamp()}",
+            name=f"{model_name}_{get_timestamp()}",
             tags=tags if tags is not None else [],
             group=group,
         )

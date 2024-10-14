@@ -7,11 +7,11 @@ import yaml
 from detectron2.config import get_cfg
 from detectron2.engine import DefaultTrainer
 from detectron2 import model_zoo
-from data_loader import register_datasets
+from Data_register import register_datasets
 from Wandb import WandbLoggerHook
-from train import MyTrainer
+from Trainer import MyTrainer
 from datetime import datetime
-from model import setup_model
+from Model import setup_model
 
 
 def get_timestamp():
@@ -45,10 +45,10 @@ def main():
     trainer.resume_or_load(resume=False)
 
     wandb_logger_hook = WandbLoggerHook(
-        model_name="Faster-RCNN",
+        model_name=config['MODEL']['WEIGHTS'],
         project_name="level2-objectdetection-cv-13",
         entity="superl3-naver",
-        group="model_test",
+        group="Faster-RCNN",
         tags=["Detectron2", "Faster-R-CNN", "Non-Augmented"]
     )
 
