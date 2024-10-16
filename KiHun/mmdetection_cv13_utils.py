@@ -1,5 +1,43 @@
 import os
 from mmcv import Config
+import datetime
+
+import wandb
+def get_timestamp():
+    now = datetime.datetime.now()
+    return now.strftime("%m%d_%H%M")
+
+def wandb_setup(cfg, model_name):
+    # wandb
+    wandb.login(key="350e50a8ed217678324bb18c08665de9ae70269a")
+
+    cfg.log_config = dict(
+        interval=50,
+        hooks=[
+            dict(type='TextLoggerHook'),
+            dict(type='WandbLoggerHook',
+                interval=100,  # log to wandb every 100 iterations
+                init_kwargs=dict(
+                    project='mmdet_test',  
+                    entity="superl3-naver",    
+                    name = f"{model_name}_{get_timestamp()}",
+                    tags=["MMDetection", "Cascade R-CNN", "No_Mosaic"],                    																             
+                    group="model_test",
+                    config={
+                        "batch_size": cfg.data.samples_per_gpu,
+                        "base_learning_rate": cfg.optimizer.lr,
+                        "steps": cfg.lr_config.step,
+                        "gamma": cfg.lr_config.gamma if hasattr(cfg.lr_config, 'gamma') else 0.1,
+                        "model_weights": cfg.load_from,
+                        "batch_size_per_image": cfg.model.roi_head.train_cfg.rcnn.sampler.num if hasattr(cfg.model.roi_head, 'train_cfg') else None
+                    }            
+                )
+            )
+        ]
+    )
+    print("wandb init done!")
+
+    return cfg
 
 def set_default_dataset(cfg):
 

@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 
-from mmdetection_cv13_utils import (set_default_dataset, load_config_from_arg, get_work_dir_from_arg)
+from mmdetection_cv13_utils import (set_default_dataset, load_config_from_arg, get_work_dir_from_arg, wandb_setup)
 from mmdetection_cv13_train import train
 from mmdetection_cv13_inference import inference
 
@@ -11,6 +11,8 @@ def main(args):
     
     # 기본 데이터셋 및 설정 적용
     cfg = set_default_dataset(cfg)
+    
+    cfg = wandb_setup(cfg, args.config)
 
     # 체크포인트 불러오기 옵션
     if args.checkpoint:
