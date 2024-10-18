@@ -1,0 +1,26 @@
+# Retina_Net_config.yaml
+DATASETS:
+  TRAIN: 'coco_trash_train'
+  TEST: 'coco_trash_test'
+
+DATALOADER:
+  NUM_WORKERS: 4
+
+MODEL:
+  WEIGHTS: "COCO-Detection/retinanet_R_101_FPN_3x.yaml" # 모델 변경
+  RETINANET:
+     NUM_CLASSES: 10
+
+SOLVER:
+  IMS_PER_BATCH: 4
+  BASE_LR: 0.0025 
+  MAX_ITER: 15000 
+  STEPS: [8000,12000]
+  GAMMA: 0.005
+  CHECKPOINT_PERIOD: 5000
+  WARMUP_ITERS: 540
+  AMP:
+    ENABLED: True
+OUTPUT_DIR: './output_retinanet_R101_FPN' 
+TEST:
+  EVAL_PERIOD: 3000
