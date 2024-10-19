@@ -28,14 +28,13 @@ backend_args = None
 train_pipeline = [
     dict(type='LoadImageFromFile', backend_args=backend_args),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', scale=(512, 512)),
+    dict(type='Resize', scale=(256, 256)),
     dict(type='RandomFlip', prob=0.5),
     dict(type='PackDetInputs')
 ]
 test_pipeline = [
     dict(type='LoadImageFromFile', backend_args=backend_args),
     dict(type='Resize', scale=(512, 512)),
-    # If you don't have a gt annotation, delete the pipeline
     dict(
         type='PackDetInputs',
         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
@@ -70,7 +69,6 @@ val_dataloader = dict(
         test_mode=True,
         pipeline=test_pipeline
         ))
-test_dataloader = val_dataloader
 
 val_evaluator = dict(
     type='CocoMetric',
@@ -78,4 +76,26 @@ val_evaluator = dict(
     metric='bbox',
     format_only=False,
     )
-test_evaluator = val_evaluator
+
+test_dataloader = dict(
+    batch_size=1,
+    num_workers=1,
+    persistent_workers=True,
+    drop_last=False,
+    sampler=dict(type='DefaultSampler', shuffle=False),
+    dataset=dict(
+        type=dataset_type,
+        data_root=data_root,
+        metainfo=metainfo,
+        ann_file='test.json',
+        data_prefix=dict(img=''),
+        test_mode=True,
+        pipeline=test_pipeline
+        ))
+
+test_evaluator = dict(
+    type='CocoMetric',
+    ann_file=data_root + 'test.json',
+    metric='bbox',
+    format_only=False,
+    )

@@ -87,7 +87,7 @@ def wandb_setup(cfg, model_path):
         ]
     cfg.visualizer = dict(type='Visualizer', vis_backends=vis_backends, name="visualizer")  # wandb를 위한 비주얼라이저
     
-    cfg.log_level = 'DEBUG'
+    #cfg.log_level = 'DEBUG'
     
     print("wandb init done!")
 
