@@ -3,6 +3,10 @@ import argparse
 import os
 import os.path as osp
 
+import matplotlib.pyplot as plt
+from mmengine.dataset import Compose
+
+import mmcv
 from mmengine.config import Config, DictAction
 from mmengine.registry import RUNNERS
 from mmengine.runner import Runner
@@ -48,6 +52,11 @@ def parse_args():
         choices=['none', 'pytorch', 'slurm', 'mpi'],
         default='none',
         help='job launcher')
+    parser.add_argument(
+        '--checkdata',
+        action='store_true',
+        default=False
+    )
     # When using PyTorch version >= 2.0.0, the `torch.distributed.launch`
     # will pass the `--local-rank` parameter to `tools/train.py` instead
     # of `--local_rank`.
@@ -144,8 +153,6 @@ def main():
         cfg.resume = True
         cfg.load_from = args.resume
 
-    
-
     # build the runner from config
     if 'runner_type' not in cfg:
         # build the default runner
@@ -155,9 +162,31 @@ def main():
         # if 'runner_type' is set in the cfg
         runner = RUNNERS.build(cfg)
 
-    
-    # start training
-    runner.train()
+    if args.checkdata == True:
+        # Runner가 설정된 후, 데이터셋에 접근하는 방법
+        train_dataloader = runner.train_dataloader
+
+        # DataLoader에서 Dataset 접근
+        train_dataset = train_dataloader.dataset
+
+        for i in range(50):
+            # 첫 번째 샘플 확인 (증강 적용 후)
+            sample = train_dataset[i]
+
+            img = sample['inputs'].numpy().transpose(1, 2, 0)
+
+            # 이미지 저장 (예: PNG 형식으로 저장)
+            output_path = 'augmented_image' + str(i) + '.png'
+
+            # 이미지가 BGR 형식이라면 RGB로 변환 (optional, 필요한 경우만)
+            img_rgb = mmcv.bgr2rgb(img)
+
+            # 이미지 파일로 저장 (PNG 형식)
+            plt.imsave(output_path, img_rgb)
+
+    if args.checkdata == False:
+        # start training
+        runner.train()
 
 
 if __name__ == '__main__':
