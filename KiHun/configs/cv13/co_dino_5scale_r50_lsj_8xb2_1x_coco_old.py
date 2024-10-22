@@ -1,22 +1,16 @@
-_base_ = ['../_base_/default_runtime.py',
-          'retinanet_tta.py']
+_base_ = 'mmdet::common/ssj_scp_270k_coco-instance.py'
 
 custom_imports = dict(
     imports=['projects.CO-DETR.codetr'], allow_failed_imports=False)
 
-pretrained = 'https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_large_patch4_window12_384_22k.pth'  # noqa
-
 # model settings
 num_dec_layer = 6
 loss_lambda = 2.0
-num_classes = 10
+num_classes = 80
 
-image_size = (512, 512)
-
-test_image_size = (512, 512)
-
+image_size = (1024, 1024)
 batch_augments = [
-    dict(type='BatchFixedSizePad', size=image_size, pad_mask=False)
+    dict(type='BatchFixedSizePad', size=image_size, pad_mask=True)
 ]
 model = dict(
     type='CoDETR',
@@ -32,31 +26,21 @@ model = dict(
         mean=[123.675, 116.28, 103.53],
         std=[58.395, 57.12, 57.375],
         bgr_to_rgb=True,
-        pad_mask=False,
+        pad_mask=True,
         batch_augments=batch_augments),
     backbone=dict(
-        type='SwinTransformer',
-        pretrain_img_size=384,
-        embed_dims=192,
-        depths=[2, 2, 18, 2],
-        num_heads=[6, 12, 24, 48],
-        window_size=12,
-        mlp_ratio=4,
-        qkv_bias=True,
-        qk_scale=None,
-        drop_rate=0.5,
-        attn_drop_rate=0.,
-        drop_path_rate=0.3,
-        patch_norm=True,
+        type='ResNet',
+        depth=50,
+        num_stages=4,
         out_indices=(0, 1, 2, 3),
-        # Please only add indices that would be used
-        # in FPN, otherwise some parameter will not be used
-        with_cp=False,
-        convert_weights=True,
-        init_cfg=dict(type='Pretrained', checkpoint=pretrained)),
+        frozen_stages=1,
+        norm_cfg=dict(type='BN', requires_grad=False),
+        norm_eval=True,
+        style='pytorch',
+        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     neck=dict(
         type='ChannelMapper',
-        in_channels=[192, 384, 768, 1536],
+        in_channels=[256, 512, 1024, 2048],
         kernel_size=1,
         out_channels=256,
         act_cfg=None,
@@ -83,7 +67,7 @@ model = dict(
                 # number of layers that use checkpoint.
                 # The maximum value for the setting is num_layers.
                 # FairScale must be installed for it to work.
-                with_cp=6,
+                with_cp=4,
                 transformerlayers=dict(
                     type='BaseTransformerLayer',
                     attn_cfgs=dict(
@@ -291,14 +275,17 @@ model = dict(
         # e.g., nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.05)
     ])
 
+
+backend_args = None
+
 # LSJ + CopyPaste
 load_pipeline = [
     dict(type='LoadImageFromFile'),
-    dict(type='LoadAnnotations', with_bbox=True, with_mask=False),
+    dict(type='LoadAnnotations', with_bbox=True, with_mask=True),
     dict(
         type='RandomResize',
         scale=image_size,
-        ratio_range=(0.25, 2.0),
+        ratio_range=(0.1, 2.0),
         keep_ratio=True),
     dict(
         type='RandomCrop',
@@ -310,111 +297,62 @@ load_pipeline = [
     dict(type='RandomFlip', prob=0.5),
     dict(type='Pad', size=image_size, pad_val=dict(img=(114, 114, 114))),
 ]
+
 train_pipeline = [
-    dict(type='Mosaic', img_scale=image_size, pad_val=114.0),
-    dict(type='MixUp', img_scale=image_size, ratio_range=(0.8, 1.2), pad_val=114.0),  # 비율 조정
-    dict(type='PackDetInputs'),
+    dict(type='CopyPaste', max_num_pasted=100),
+    dict(type='PackDetInputs')
 ]
 
+train_dataloader = dict(
+    sampler=dict(type='DefaultSampler', shuffle=True),
+    dataset=dict(
+        _delete_=True,
+        type='MultiImageMixDataset',
+        dataset=dict(
+            ann_file='annotations/instances_train2017.json',
+            data_prefix=dict(img=''),
+            filter_cfg=dict(filter_empty_gt=True, min_size=32),
+            pipeline=load_pipeline),
+        pipeline=train_pipeline))
+
+train_dataloader = dict(
+    sampler=dict(type='DefaultSampler', shuffle=True),
+    dataset=dict(
+        pipeline=train_pipeline,
+        dataset=dict(
+            filter_cfg=dict(filter_empty_gt=False), pipeline=load_pipeline)))
+
+# follow ViTDet
 test_pipeline = [
     dict(type='LoadImageFromFile'),
-    dict(type='Resize', scale=test_image_size, keep_ratio=True),
-    dict(type='Pad', size=test_image_size, pad_val=dict(img=(114, 114, 114))),
-    dict(type='LoadAnnotations', with_bbox=True, with_mask=False),
+    dict(type='Resize', scale=image_size, keep_ratio=True),  # diff
+    dict(type='Pad', size=image_size, pad_val=dict(img=(114, 114, 114))),
+    dict(type='LoadAnnotations', with_bbox=True, with_mask=True),
     dict(
         type='PackDetInputs',
         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
                    'scale_factor'))
 ]
 
-# dataset settings
-dataset_type = 'CocoDataset'
-data_root = '../dataset/'
-
-metainfo = {
-    'classes': ('General trash', 'Paper', 'Paper pack', 'Metal', 'Glass',
-                'Plastic', 'Styrofoam', 'Plastic bag', 'Battery', 'Clothing',),
-    'palette': [
-        (220, 20, 60), (119, 11, 32), (0, 0, 230), (106, 0, 228), (60, 20, 220),
-        (0, 80, 100), (0, 0, 70), (50, 0, 192), (250, 170, 30), (255, 0, 0)
-    ]
-}
-train_dataloader = dict(
-    batch_size=4,
-    num_workers=2,
-    sampler=dict(type='DefaultSampler', shuffle=True),
-    dataset=dict(
-        type='MultiImageMixDataset',
-        dataset=dict(
-            type=dataset_type,
-            data_root=data_root,
-            metainfo=metainfo,
-            ann_file='train_split.json',
-            data_prefix=dict(img=''),
-            filter_cfg=dict(filter_empty_gt=False, min_size=32),
-            pipeline=load_pipeline),
-        pipeline=train_pipeline))
-
-test_dataloader = dict(
-    batch_size=4,
-    num_workers=2,
-    persistent_workers=True,
-    drop_last=False,
-    sampler=dict(type='DefaultSampler', shuffle=False),
-    dataset=dict(
-        type=dataset_type,
-        data_root=data_root,
-        metainfo=metainfo,
-        ann_file='test.json',
-        data_prefix=dict(img=''),
-        test_mode=True,
-        pipeline=test_pipeline
-    )
-)
-
-val_dataloader = dict(
-    batch_size=4,
-    num_workers=2,
-    persistent_workers=True,
-    drop_last=False,
-    sampler=dict(type='DefaultSampler', shuffle=False),
-    dataset=dict(
-        type=dataset_type,
-        data_root=data_root,
-        metainfo=metainfo,
-        ann_file='val_split.json',
-        data_prefix=dict(img=''),
-        test_mode=True,
-        pipeline=test_pipeline
-        ))
+val_dataloader = dict(dataset=dict(pipeline=test_pipeline))
+test_dataloader = val_dataloader
 
 optim_wrapper = dict(
+    _delete_=True,
     type='OptimWrapper',
     optimizer=dict(type='AdamW', lr=2e-4, weight_decay=0.0001),
     clip_grad=dict(max_norm=0.1, norm_type=2),
     paramwise_cfg=dict(custom_keys={'backbone': dict(lr_mult=0.1)}))
 
-val_evaluator = dict(
-    type='CocoMetric',
-    ann_file=data_root + 'val_split.json',
-    metric='bbox',
-    format_only=False,
-    )
+val_evaluator = dict(metric='bbox')
+test_evaluator = val_evaluator
 
-test_evaluator = dict(
-    type='CocoMetric',
-    ann_file=data_root + 'test.json',
-    metric='bbox',
-    format_only=False,
-    )
-
-max_epochs = 36
+max_epochs = 12
 train_cfg = dict(
+    _delete_=True,
     type='EpochBasedTrainLoop',
     max_epochs=max_epochs,
     val_interval=1)
-val_cfg = dict(type='ValLoop')
-test_cfg = dict(type='TestLoop')
 
 param_scheduler = [
     dict(
@@ -422,22 +360,15 @@ param_scheduler = [
         begin=0,
         end=max_epochs,
         by_epoch=True,
-        milestones=[30],
+        milestones=[11],
         gamma=0.1)
 ]
 
 default_hooks = dict(
-    checkpoint=dict(by_epoch=True, interval=1, max_keep_ckpts=3),
-    visualization=dict(type='DetVisualizationHook')
-)
-
-visualizer = dict(
-    type='DetLocalVisualizer', vis_backends=[dict(type='LocalVisBackend')], name='visualizer')
-
+    checkpoint=dict(by_epoch=True, interval=1, max_keep_ckpts=3))
 log_processor = dict(by_epoch=True)
 
 # NOTE: `auto_scale_lr` is for automatically scaling LR,
 # USER SHOULD NOT CHANGE ITS VALUES.
 # base_batch_size = (8 GPUs) x (2 samples per GPU)
 auto_scale_lr = dict(base_batch_size=16)
-

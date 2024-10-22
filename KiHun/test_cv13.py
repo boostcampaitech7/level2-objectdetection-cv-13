@@ -53,6 +53,7 @@ def parse_args():
         default='none',
         help='job launcher')
     parser.add_argument('--tta', action='store_true')
+    parser.add_argument('--streamlit', action='store_true', default=False)
     # When using PyTorch version >= 2.0.0, the `torch.distributed.launch`
     # will pass the `--local-rank` parameter to `tools/train.py` instead
     # of `--local_rank`.
@@ -68,7 +69,10 @@ def parse_args():
 
 
 def main():
+
     args = parse_args()
+
+    config_name = osp.splitext(osp.basename(args.config))[0]
 
     # Reduce the number of repeated compilations and improve
     # testing speed.
@@ -87,7 +91,7 @@ def main():
     elif cfg.get('work_dir', None) is None:
         # use config filename as default work_dir if cfg.work_dir is None
         cfg.work_dir = osp.join('./work_dirs',
-                                osp.splitext(osp.basename(args.config))[0])
+                                config_name)
 
     cfg.load_from = cfg.work_dir + '/' + args.checkpoint
 
@@ -118,11 +122,7 @@ def main():
                         dict(type='RandomFlip', prob=0.)
                     ],
                     [
-                        dict(
-                            type='PackDetInputs',
-                            meta_keys=('img_id', 'img_path', 'ori_shape',
-                                       'img_shape', 'scale_factor', 'flip',
-                                       'flip_direction'))
+                        dict(type='PackDetInputs')
                     ],
                 ])
             cfg.tta_pipeline[-1] = flip_tta
@@ -131,6 +131,10 @@ def main():
 
     # evaluate를 생략하기 위해, evaluator 부분을 비활성화
     cfg.evaluator = None  # 평가를 위한 evaluator를 None으로 설정
+
+    if args.streamlit is True:
+        cfg.test_dataloader = cfg.val_dataloader
+        cfg.test_evaluator = cfg.val_evaluator
 
     # build the runner from config
     if 'runner_type' not in cfg:
@@ -147,6 +151,12 @@ def main():
             DumpDetResults(out_file_path='results.pkl'))
 
         # start testing
+        ann_file_path = cfg.test_evaluator.get('ann_file', None)
+        coco = COCO(ann_file_path)
+
+        img_ids = coco.getImgIds()  # 이미지 ID 가져오기
+        print(len(img_ids))
+
         test_results = runner.test()
     
     with open('results.pkl', 'rb') as f:
@@ -155,6 +165,8 @@ def main():
     # --- 결과 후처리 및 submission.csv 파일 생성 ---
         # COCO dataset 정보를 이용하여 output을 후처리
         ann_file_path = cfg.test_evaluator.get('ann_file', None)
+        
+        print(ann_file_path)
         if ann_file_path is None:
             raise AttributeError("Annotation file path is missing in the config")
         coco = COCO(ann_file_path)
@@ -164,6 +176,8 @@ def main():
         
         prediction_strings = []
         file_names = []
+
+        print(test_results)
 
         # test_results를 COCO 형식으로 변환 후 submission 파일 작성
         for i, out in enumerate(test_results):
@@ -191,8 +205,16 @@ def main():
         submission['PredictionString'] = prediction_strings
         submission['image_id'] = file_names
 
+
+        submission_filename = 'submission.csv'
+        submission_path = cfg.work_dir
+
+        if args.streamlit is True:
+            submission_filename = config_name + '.csv'
+            submission_path = '../streamlit/output/'
+
         # 결과 CSV 저장
-        submission.to_csv(os.path.join(cfg.work_dir, 'submission.csv'), index=False)
+        submission.to_csv(os.path.join(submission_path, submission_filename), index=False)
 
         print(submission.head())  # 결과 미리보기
 
