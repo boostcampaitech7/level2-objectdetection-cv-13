@@ -34,35 +34,8 @@ Faseter-RCNN
 ### main.py
 - Faster_rcnn_config으로 모델 세팅값 설정
 
-
-
-
-## 가설
-
-### ROI가 증가하면 정확도가 올라갈 것이다.
-```aiignore
-DATASETS:
-  TRAIN: 'coco_trash_train'
-  TEST: 'coco_trash_test'
-
-DATALOADER:
-  NUM_WORKERS: 2
-
-MODEL:
-  WEIGHTS: 'COCO-Detection/faster_rcnn_R_101_FPN_3x.yaml'
-  ROI_HEADS:
-    BATCH_SIZE_PER_IMAGE: 128
-    NUM_CLASSES: 10
-
-SOLVER:
-  IMS_PER_BATCH: 4
-  BASE_LR: 0.0025
-  MAX_ITER: 15000
-  STEPS: [8000, 12000]
-  GAMMA: 0.005
-  CHECKPOINT_PERIOD: 3000
-  WARMUP_ITERS : 3000
-OUTPUT_DIR: './output'
-TEST:
-  EVAL_PERIOD: 3000
+### 실행
+- config 파일을 통해서 사전 세팅
+```실행
+python main.py
 ```
